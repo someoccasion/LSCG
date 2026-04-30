@@ -330,9 +330,8 @@ export class LeashingModule extends BaseModule {
                         return true;
                     }
                 }
-            }
-            else    
-                return next(args);
+            }   
+            return next(args);
         }, ModuleCategory.Leashed);
 
         hookFunction("ChatRoomPingLeashedPlayers", 1, (args, next) => {
@@ -348,7 +347,7 @@ export class LeashingModule extends BaseModule {
         hookFunction("ChatRoomDoPingLeashedPlayers", 1, (args, next) => {
             next(args);
             let SenderCharacter = args[0];
-            if (!ChatRoomCanBeLeashedBy(SenderCharacter.MemberNumber, Player)) {
+            if (!ChatRoomCanBeLeashedBy(SenderCharacter.MemberNumber!, Player)) {
                 this.DoEscape(SenderCharacter);
             }
         }, ModuleCategory.Leashed);
@@ -383,6 +382,7 @@ export class LeashingModule extends BaseModule {
             this.LeashingsMemberNumbers.filter(id => currentRoomIds.indexOf(id) == -1).forEach(memberNumber => {
                 ServerSend("AccountBeep", { MemberNumber: memberNumber, BeepType: "Leash"});
             });
+            return ret;
         }, ModuleCategory.Leashed);
 
         hookFunction("ChatRoomMapViewLeash", 1, (args, next) => {
@@ -419,13 +419,15 @@ export class LeashingModule extends BaseModule {
 
         // Allow for similar "hand-gagging" when certain custom actions are done
         hookFunction("ServerSend", 1, (args, next) => {
-            if (args[0] == "ChatRoomChat" && args[1]?.Type == "Chat"){
+            const msg = args[0];
+            if (msg == "ChatRoomChat" && (args[1] as ServerChatRoomMessage)?.Type == "Chat"){
+                const data = args[1] as ServerChatRoomMessage;
                 if (this.IsCustomGagged) {
                     let gagIncrease = 2 * this.GaggingLeashings.length;
                     let currentGagLevel = callOriginal("SpeechGetTotalGagLevel", [Player, true]);
-                    args[1].Content = SpeechGarbleByGagLevel(currentGagLevel + gagIncrease, args[1].Content);
-                    args[1].Content = SpeechStutter(Player, args[1].Content);
-                    args[1].Content = SpeechBabyTalk(Player, args[1].Content);
+                    data.Content = SpeechGarbleByGagLevel(currentGagLevel + gagIncrease, data.Content);
+                    data.Content = SpeechStutter(Player, data.Content);
+                    data.Content = SpeechBabyTalk(Player, data.Content);
                 }
             }
             next(args);
@@ -444,17 +446,16 @@ export class LeashingModule extends BaseModule {
         ];             
 
         hookFunction('ServerSend', 5, (args, next) => {
-            let sendType = args[0];
-            let data = args[1]; 
-            if (sendType == "ChatRoomChat" && data?.Type == "Activity"){
-                var activityName = GetActivityName(data);
-                if (activityName == "Lick" && this.Pairings.some(p => !p.IsSource && p.Type == "tongue"))
+            let msg = args[0];
+            if (msg == "ChatRoomChat" && (args[1] as ServerChatRoomMessage)?.Type == "Activity"){
+                let data = args[1] as ServerChatRoomMessage; 
+                const activityName = GetActivityName(data);
+                if (activityName == "Lick" && this.Pairings.some(p => !p.IsSource && p.Type == "tongue")) {
                     SendAction(failedLinkActions[getRandomInt(failedLinkActions.length)]);
-                else
-                    return next(args);
-            } else {
-                return next(args);
+                    return;
+                }
             }
+            return next(args);
         }, ModuleCategory.Leashed);
 
         getModule<CoreModule>("CoreModule").RegisterCommandListener(<CommandListener>{
