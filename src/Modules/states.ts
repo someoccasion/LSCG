@@ -211,11 +211,12 @@ export class StateModule extends BaseModule {
 
         // General Hooks
         hookFunction("ChatRoomSync", 10, (args, next) => {
-            next(args);
+            const ret = next(args);
             if (!this.Enabled)
-                return;
+                return ret;
             
             this.States.forEach(s => s.RoomSync());
+            return ret;
         }, ModuleCategory.States);
 
         hookFunction('ServerSend', 5, (args, next) => {
