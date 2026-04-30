@@ -96,6 +96,7 @@ type LSCGAssetGroupItemName = AssetGroupItemName
 type LSCGAssetGroupName = LSCGAssetGroupBodyName | LSCGAssetGroupItemName;
 
 type LSCGActivityName = ActivityName
+    | LSCGSpecialItems
     | "Bap"
     | "Chew"
     | "Chomp"
@@ -108,6 +109,9 @@ type LSCGActivityName = ActivityName
     | "FuckWithPussy"
     | "FunnelPour"
     | "Flick"
+    | "GagGiveItem"
+    | "GagTakeItem"
+    | "GagToNecklace"
     | "Grab"
     | "GrabTongue"
     | "GrabTongueWithFoot"
@@ -115,6 +119,7 @@ type LSCGActivityName = ActivityName
     | "HoldHand"
     | "Hug"
     | "KissEyes"
+    | "NecklaceToGag"
     | "NetGun"
     | "Nuzzle"
     | "Quaff"
@@ -127,6 +132,7 @@ type LSCGActivityName = ActivityName
     | "ReleaseMouth"
     | "ReleaseNeck"
     | "ReleaseTongue"
+    | "RopeCoil"
     | "RubPussy"
     | "SlapPenis"
     | "Splat"
@@ -141,9 +147,12 @@ type LSCGActivityName = ActivityName
 ;
 
 type LSCGSpecialItems =
+    | "CameraItem"
     | "ChewableItem"
     | "EdibleItem"
     | "FellatioItem"
+    | "MagicItem"
+    | "PlushItem"
     | "PourableItem"
     | "QuaffableItem"
     | "AnyItem"
