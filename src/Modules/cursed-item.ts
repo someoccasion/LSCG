@@ -72,8 +72,7 @@ export class CursedItemModule extends BaseModule {
         }, ModuleCategory.CursedItem);
 
         hookFunction("ElementButton.CreateForAsset", 1, ([idPrefix, asset, C, onClick, options, ...args], next) => {
-            const craft: null | CraftingItem = "Asset" in asset ? asset.Craft : null;
-            if (!craft) {
+            if (!("Asset" in asset)) {
                 return next([idPrefix, asset, C, onClick, options, ...args]);
             }
             let isCursed = CursedKeywords.some(str => isPhraseInString(GetItemNameAndDescriptionConcat(asset) ?? "", str, true));

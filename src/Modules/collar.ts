@@ -294,26 +294,27 @@ export class CollarModule extends BaseModule {
 
         // event on room join
         hookFunction("ChatRoomSync", 4, (args, next) => {
-            next(args);
-            if (!this.Enabled)
-                return;
-            else
+            const ret = next(args);
+            if (this.Enabled) {
                 this.ReleaseHandChoke(null, false);
-            this.ActivateChokeEvent();
-            this.CheckGagSuffocate("ChatRoomSync", Player);
+                this.ActivateChokeEvent();
+                this.CheckGagSuffocate("ChatRoomSync", Player);
+            }
+            return ret;
         }, ModuleCategory.Collar);
 
         hookFunction('ServerSend', 4, (args, next) => {
             // if (!this.Enabled && !Player.LSCG.MiscModule.handChokeEnabled)
             //     return next(args);
+            const data = args[1] as ServerChatRoomMessage;
             // Prevent speech at choke level 4
-            if (args[0] == "ChatRoomChat" && args[1]?.Type == "Chat" && !args[1]?.Content?.startsWith("(")){
+            if (args[0] == "ChatRoomChat" && data?.Type == "Chat" && !data?.Content?.startsWith("(")){
                 if (this.totalChokeLevel >= 4) {
                     SendAction(this.gagSpeechlessLines[getRandomInt(this.gagSpeechlessLines.length)]);
                     return null;
                 }
                 else if (this.totalChokeLevel > 1) {
-                    args[1].Content = SpeechGarbleByGagLevel((this.totalChokeLevel - 1)**2, args[1].Content);
+                    data.Content = SpeechGarbleByGagLevel((this.totalChokeLevel - 1)**2, data.Content);
                     return next(args);
                 }
                 else

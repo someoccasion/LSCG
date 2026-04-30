@@ -67,8 +67,8 @@ export function parseMsgWords(msg: string): RegExpMatchArray | null {
     return lowerMsgWords;
 }
 
-export function getCharacter(memberNumber: number) {
-	return ChatRoomCharacter.find(c => c.MemberNumber == memberNumber) ?? null;
+export function getCharacter(memberNumber: number | undefined | null) {
+	return ChatRoomCharacter.find(c => c.MemberNumber === memberNumber) ?? null;
 }
 
 export function getCharacterByNicknameOrMemberNumber(tgt: string): Character | undefined {

@@ -208,8 +208,8 @@ export class InjectorModule extends BaseModule {
         });
 
         hookFunction("ServerSend", 100, (args, next) => {
-            if (args[0] == "ChatRoomChat" && args[1]?.Type == "Activity" && this.Enabled){
-                let data = args[1];
+            const data = args[1] as ServerChatRoomMessage;
+            if (args[0] == "ChatRoomChat" && data?.Type == "Activity" && this.Enabled){
                 let actName = GetActivityName(data) ?? "";
                 if (actName == "SipItem" || actName == "LSCG_FunnelPour") {
                     let fullPour = actName == "LSCG_FunnelPour";

@@ -223,8 +223,9 @@ export class StateModule extends BaseModule {
             if (!this.Enabled)
                 return next(args);
 
-            let type = args[0];
-            if (type == "ChatRoomChat" && args[1].Type == "Chat" && args[1]?.Content[0] != "(") {
+            const type = args[0];
+            const data = args[1] as ServerChatRoomMessage;
+            if (type == "ChatRoomChat" && data.Type == "Chat" && data?.Content[0] != "(") {
                 let speechBlockStates = this.GetRestrictions(r => r.Speech);
                 if (speechBlockStates.length > 0){
                     speechBlockStates[getRandomInt(speechBlockStates.length)].SpeechBlock();
@@ -307,7 +308,7 @@ export class StateModule extends BaseModule {
 
         hookFunction('PoseCanChangeUnaided', 6, (args, next) => {
             if (this.Enabled && this.AnyRestrictions(r => r.Move)) {
-                return;
+                return false;
             }
             return next(args);
         }, ModuleCategory.States);
