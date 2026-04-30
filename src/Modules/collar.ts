@@ -395,7 +395,7 @@ export class CollarModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
+                Func: (target) => {
                     if (target?.IsPlayer())
                         this.TightenButtonPress(Player);
                     else if (!!target)
@@ -422,7 +422,7 @@ export class CollarModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
+                Func: (target) => {
                     if (target?.IsPlayer())
                         this.LoosenButtonPress(Player);
                     else if (!!target)
@@ -449,7 +449,7 @@ export class CollarModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
+                Func: (target) => {
                     if (target?.IsPlayer())
                         this.StatsButtonPress(Player);
                     else if (!!target)

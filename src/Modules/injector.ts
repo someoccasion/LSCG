@@ -324,7 +324,7 @@ export class InjectorModule extends BaseModule {
                     }
                 ],
                 CustomAction: {
-                    Func: (target, args, next) => {
+                    Func: (target) => {
                         if (!!target) {
                             // if (target.MemberName != Player.MemberNumber) {
                             // 	SendAction("%NAME% takes aim at %OPP_NAME% with %POSSESSIVE% net gun.", target);
@@ -334,9 +334,7 @@ export class InjectorModule extends BaseModule {
                             // 	this.ShootNetgun(target)
                             // }
                             setTimeout(() => this.ShootNetgun(target), EFFECT_DURATIONS.ACTION_DELAY);
-                            return next(args);
                         }
-                        else return next(args);
                     }
                 },
                 CustomImage: "Assets/Female3DCG/ItemDevices/Preview/Net.png"

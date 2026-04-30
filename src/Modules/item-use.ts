@@ -919,19 +919,19 @@ export class ItemUseModule extends BaseModule {
 				}
 			],
 			CustomAction: {
-				Func: (target, args, next) => {
-					if (!target)
-						return;
-					let ret = next(args);
-					var location = target.FocusGroup?.Name  ?? args[1].Dictionary.find((entry: { Tag: string; }) => entry?.Tag == "FocusAssetGroup")?.FocusGroupName;
+				Func: (target, data, meta) => {
+					if (!target) return false;
+					let location: AssetGroupName | undefined = target.FocusGroup?.Name ?? meta?.FocusGroup?.Name;
 					let heldItemName = InventoryGet(Player, "ItemHandheld")?.Asset.Name ?? "";
 					let gagTarget = this.GagTargets.find(t => t.HandItemName == heldItemName);
 					if (!!gagTarget) {
 						if (location == "ItemNeck")
 							location = gagTarget.OverrideNeckLocation ?? "Necklace";
-						this.ApplyGag(target, Player, gagTarget, location);
+						if (location) {
+							this.ApplyGag(target, Player, gagTarget, location);
+						}
 					}
-					return ret;
+					return true;
 				}
 			},
 			CustomImage: "Assets/Female3DCG/ItemHandheld/Preview/Ballgag.png"
@@ -1001,10 +1001,10 @@ export class ItemUseModule extends BaseModule {
 				}
 			],
 			CustomAction: {
-				Func: (target, args, next) => {
+				Func: (target, data, meta) => {
 					if (!target)
 						return;
-					let location = target.FocusGroup?.Name ?? args[1].Dictionary.find((entry: { Tag: string; }) => entry?.Tag == "FocusAssetGroup")?.FocusGroupName;
+					let location: AssetGroupName | undefined = target.FocusGroup?.Name ?? meta?.FocusGroup?.Name;
 					let itemName: string | undefined;
 					let gagTarget: GagTarget | undefined;
 					if (location == "ItemNeck") {
@@ -1021,9 +1021,8 @@ export class ItemUseModule extends BaseModule {
 						gagTarget = this.GagTargets.find(t => !!itemName && t.MouthItemName == itemName);
 					}
 
-					if (!!gagTarget)
+					if (!!gagTarget && location)
 						this.TakeGag(target, Player, gagTarget, location);
-					return next(args);
 				}
 			},
 			CustomImage: "Assets/Female3DCG/ItemMouth/Preview/BallGag.png"
@@ -1067,19 +1066,17 @@ export class ItemUseModule extends BaseModule {
 				}
 			],
 			CustomAction: {
-				Func: (target, args, next) => {
-					var dict = args[1]?.Dictionary;
-					if (!target || !dict)
-						return;
-					var activityAsset = dict.find((x: { Tag: string; }) => x.Tag == "ActivityAsset");
-					var location = target.FocusGroup?.Name ?? dict.find((entry: { Tag: string; }) => entry?.Tag == "FocusAssetGroup")?.FocusGroupName;
-					let heldItemName = InventoryGet(target, activityAsset.GroupName)?.Asset.Name ?? "";
-					let gagTarget = this.GagTargets.find(t => t.NeckItemName == heldItemName);
+				Func: (target, data, meta) => {
+					if (!target) return;
+					const activityAsset = meta?.ActivityAsset;
+					const location = target.FocusGroup?.Name ?? meta?.FocusGroup?.Name;
+					if (!location || !activityAsset) return;
+					const heldItemName = InventoryGet(target, activityAsset.Group.Name)?.Asset.Name ?? "";
+					const gagTarget = this.GagTargets.find(t => t.NeckItemName == heldItemName);
 					//if (!gagTarget) gagTarget = this.GagTargets.find(t => t.NeckItemName == (InventoryGet(target, "ClothAccessory")?.Asset.Name ?? "") && t.OverrideNeckLocation == "ClothAccessory");
 					if (!!gagTarget) {
 						this.ApplyGag(target, target, gagTarget, location, gagTarget.OverrideNeckLocation ?? "Necklace");
 					}
-					return next(args);
 				}
 			},
 			CustomImage: "Assets/Female3DCG/Necklace/Preview/NecklaceBallGag.png"
@@ -1130,15 +1127,15 @@ export class ItemUseModule extends BaseModule {
 				}
 			],
 			CustomAction: {
-				Func: (target, args, next) => {
+				Func: (target, data, meta) => {
 					if (!target)
 						return;
-					var location = target.FocusGroup?.Name ?? args[1].Dictionary.find((entry: { Tag: string; }) => entry?.Tag == "FocusAssetGroup")?.FocusGroupName;
+					const location = target.FocusGroup?.Name ?? meta?.FocusGroup?.Name;
+					if (!location) return;
 					let mouthItemName = InventoryGet(target, location)?.Asset.Name ?? "";
 					let gagTarget = this.GagTargets.find(t => t.MouthItemName == mouthItemName);
 					if (!!gagTarget)
 						this.TakeGag(target, target, gagTarget, location, gagTarget?.OverrideNeckLocation ?? "Necklace");
-					return next(args);
 				}
 			},
 			CustomImage: "Assets/Female3DCG/ItemMouth/Preview/BallGag.png"
@@ -1177,14 +1174,13 @@ export class ItemUseModule extends BaseModule {
 				}
 			],
 			CustomAction: {
-				Func: (target, args, next) => {
+				Func: (target, data, meta) => {
 					if (!target)
 						return;
-					var location = target.FocusGroup?.Name ?? args[1].Dictionary.find((entry: { Tag: string; }) => entry?.Tag == "FocusAssetGroup")?.FocusGroupName ?? "";
-					let ropeTarget = this.GetHempRopeLocations().find(loc => loc.Location == location);
+					const location = target.FocusGroup?.Name ?? meta?.FocusGroup?.Name;
+					const ropeTarget = this.GetHempRopeLocations().find(loc => loc.Location == location);
 					if (!!ropeTarget)
 						this.TieUp(target, Player, ropeTarget);
-					return next(args);
 				}
 			},
 			CustomImage: "Assets/Female3DCG/ItemArms/Preview/HempRope.png"
@@ -1223,7 +1219,7 @@ export class ItemUseModule extends BaseModule {
 				}
 			],
 			CustomAction: {
-				Func: (target, args, next) => {
+				Func: (target) => {
 					if (!target)
 						return;
 					this.TrySteal(target, Player, InventoryGet(target, "ItemHandheld")!);
@@ -1267,7 +1263,7 @@ export class ItemUseModule extends BaseModule {
 				}
 			],
 			CustomAction: {
-				Func: (target, args, next) => {
+				Func: (target) => {
 					if (!target)
 						return;
 					this.TrySwap(target, InventoryGet(target, "ItemHandheld")!);
@@ -1305,7 +1301,7 @@ export class ItemUseModule extends BaseModule {
 				}
 			],
 			CustomAction: {
-				Func: (target, args, next) => {
+				Func: (target) => {
 					if (!target)
 						return;
 					this.GiveItem(target, Player);
@@ -1446,9 +1442,8 @@ export class ItemUseModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
+                Func: (target) => {
                     this.TakePhoto(target);
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/ClothAccessory/Preview/Camera1.png"
