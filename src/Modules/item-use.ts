@@ -486,7 +486,7 @@ export class ItemUseModule extends BaseModule {
 	private qaPanel: HTMLDivElement | null = null;
 
 	private updateQAPanel(C: Character): void {
-		if (!Player.CanChangeClothesOn(C)) {
+		if (!C || !Player.CanChangeClothesOn(C)) {
 			this.removeQAPanel();
 			return;
 		}
