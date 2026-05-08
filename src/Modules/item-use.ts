@@ -476,6 +476,9 @@ export class ItemUseModule extends BaseModule {
 		},{
 			MouthItemName: "FurScarf",
 			NeckItemName: "FurScarf"
+		},{
+			MouthItemName: "ClothGag",
+			NeckItemName: "SatinScarf"
 		}
 	]
 
