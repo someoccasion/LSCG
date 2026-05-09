@@ -239,6 +239,8 @@ export function SendChat(msg: string) {
     ServerSend("ChatRoomChat", {Type: "Chat", Content: msg})
 }
 
+const _templateTokenPattern = /%[A-Z_]+%/g;
+
 export function replace_template(text: string, source: Character | null = null, fallbackSourceName: string = "") {
     let result = text;
 
@@ -261,27 +263,28 @@ export function replace_template(text: string, source: Character | null = null, 
 	let oppIntensive = source == Player ? (isOppMale ? "Himself" : "Herself") : (isOppMale ? "Him" : "Her");
 	let oppPronoun = isOppMale ? "He" : "She";
 
-    return result
-		.replaceAll("%NAME%", CharacterNickname(Player))
-		.replaceAll("%POSSESSIVE%", possessive.toLocaleLowerCase())
-		.replaceAll("%NAME_POSSESSIVE_DIRECT%", namePossessiveDirect)
-		.replaceAll("%NAME_POSSESSIVE%", namePossessive)
-		.replaceAll("%PRONOUN%", pronoun.toLocaleLowerCase())
-		.replaceAll("%INTENSIVE%", intensive.toLocaleLowerCase())
-		.replaceAll("%CAP_POSSESSIVE%", possessive)
-		.replaceAll("%CAP_PRONOUN%", pronoun)
-		.replaceAll("%CAP_INTENSIVE%", intensive)
-
-		.replaceAll("%OPP_NAME%", oppName)		
-		.replaceAll("%OPP_PRONOUN%", oppPronoun.toLocaleLowerCase())
-		.replaceAll("%OPP_NAME_POSSESSIVE_DIRECT%", oppNamePossessiveDirect)
-		.replaceAll("%OPP_NAME_POSSESSIVE%", oppNamePossessive)
-		.replaceAll("%OPP_NAME_OR_SELF_PRONOUN%", oppNameOrPronoun)
-		.replaceAll("%OPP_POSSESSIVE%", oppPossessive.toLocaleLowerCase())
-		.replaceAll("%OPP_INTENSIVE%", oppIntensive.toLocaleLowerCase())
-		.replaceAll("%CAP_OPP_PRONOUN%", oppPronoun)
-		.replaceAll("%CAP_OPP_POSSESSIVE%", oppPossessive)
-		.replaceAll("%CAP_OPP_INTENSIVE%", oppIntensive);
+    const tokenMap: Record<string, string> = {
+		"%NAME%": CharacterNickname(Player),
+		"%POSSESSIVE%": possessive.toLocaleLowerCase(),
+		"%NAME_POSSESSIVE_DIRECT%": namePossessiveDirect,
+		"%NAME_POSSESSIVE%": namePossessive,
+		"%PRONOUN%": pronoun.toLocaleLowerCase(),
+		"%INTENSIVE%": intensive.toLocaleLowerCase(),
+		"%CAP_POSSESSIVE%": possessive,
+		"%CAP_PRONOUN%": pronoun,
+		"%CAP_INTENSIVE%": intensive,
+		"%OPP_NAME%": oppName,
+		"%OPP_PRONOUN%": oppPronoun.toLocaleLowerCase(),
+		"%OPP_NAME_POSSESSIVE_DIRECT%": oppNamePossessiveDirect,
+		"%OPP_NAME_POSSESSIVE%": oppNamePossessive,
+		"%OPP_NAME_OR_SELF_PRONOUN%": oppNameOrPronoun,
+		"%OPP_POSSESSIVE%": oppPossessive.toLocaleLowerCase(),
+		"%OPP_INTENSIVE%": oppIntensive.toLocaleLowerCase(),
+		"%CAP_OPP_PRONOUN%": oppPronoun,
+		"%CAP_OPP_POSSESSIVE%": oppPossessive,
+		"%CAP_OPP_INTENSIVE%": oppIntensive,
+	};
+    return result.replace(_templateTokenPattern, token => tokenMap[token] ?? token);
 }
 
 export function getRandomInt(max: number) {
@@ -488,10 +491,16 @@ export function escapeRegExp(string: string) {
 	return regEscape(string ?? "").toLocaleLowerCase();
 }
 
+const _phraseRegexCache = new Map<string, RegExp>();
+
 export function isPhraseInString(string: string, phrase: string, ignoreOOC: boolean = false) {
 	if (!string || string === "")
 		return false;
-	let praseMatch = new RegExp("(\\b|^|\\s)" + escapeRegExp(phrase) + "(\\b|$|\\s)", "i");
+	let praseMatch = _phraseRegexCache.get(phrase);
+	if (!praseMatch) {
+		praseMatch = new RegExp("(\\b|^|\\s)" + escapeRegExp(phrase) + "(\\b|$|\\s)", "i");
+		_phraseRegexCache.set(phrase, praseMatch);
+	}
 	let oocParsed = ignoreOOC ? string : excludeParentheticalContent(string);
 	return praseMatch.test(oocParsed);
 }

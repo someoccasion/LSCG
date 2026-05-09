@@ -164,7 +164,8 @@ export class StateModule extends BaseModule {
                 ChatRoomHideIconState === 0 &&
                 MouseIn(CharX, CharY, 500 * Zoom, 1000 * Zoom)
             ) {
-                let validStates = C.LSCG?.StateModule.states.filter(s => s.active);
+                let validStates = C.LSCG?.StateModule.states.filter(s => s.active) ?? [];
+                if (!validStates.length) return ret;
                 let validStateCount = validStates.length;
                 let tooltip = undefined;
                 let lineWidth = ChatRoomCharacterViewCharacterCount > 5 ? 1 : 2;
