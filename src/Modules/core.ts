@@ -86,8 +86,8 @@ export class CoreModule extends BaseModule {
         hookFunction("ServerAccountBeep", 10, (args, next) => {
             let data = args[0];
             // Intercept LSCG beeps directly
-            if (data.BeepType == "Leash" && !!data.Message && data.Message.IsLSCG === true) {
-                let msg = data.Message as LSCGMessageModel;
+            const msg = data.Message as unknown as LSCGMessageModel;
+            if (data.BeepType === "Leash" && msg && msg.IsLSCG === true) {
                 if (msg.type == "command")
                     this.Command(data.MemberNumber, msg);
             }
@@ -133,7 +133,7 @@ export class CoreModule extends BaseModule {
 
                                     const canUseCraftedItem = DialogCanUseCraftedItem as (C: Character, Craft: CraftingItem, asset: Asset) => boolean;
                                     for (const Asset of (CraftingAssets[Craft.Item] ?? [])) {
-                                        if (Asset.Group.Name === target.FocusGroup.Name && canUseCraftedItem(target, Craft, Asset)) {
+                                        if (Asset.Group.Name === target.FocusGroup?.Name && canUseCraftedItem(target, Craft, Asset)) {
                                             DialogInventoryAdd(target, { Asset, Craft }, false);
                                         }
                                     }

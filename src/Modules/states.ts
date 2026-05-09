@@ -211,19 +211,21 @@ export class StateModule extends BaseModule {
 
         // General Hooks
         hookFunction("ChatRoomSync", 10, (args, next) => {
-            next(args);
+            const ret = next(args);
             if (!this.Enabled)
-                return;
+                return ret;
             
             this.States.forEach(s => s.RoomSync());
+            return ret;
         }, ModuleCategory.States);
 
         hookFunction('ServerSend', 5, (args, next) => {
             if (!this.Enabled)
                 return next(args);
 
-            let type = args[0];
-            if (type == "ChatRoomChat" && args[1].Type == "Chat" && args[1]?.Content[0] != "(") {
+            const type = args[0];
+            const data = args[1] as ServerChatRoomMessage;
+            if (type == "ChatRoomChat" && data.Type == "Chat" && data?.Content[0] != "(") {
                 let speechBlockStates = this.GetRestrictions(r => r.Speech);
                 if (speechBlockStates.length > 0){
                     speechBlockStates[getRandomInt(speechBlockStates.length)].SpeechBlock();
@@ -306,7 +308,7 @@ export class StateModule extends BaseModule {
 
         hookFunction('PoseCanChangeUnaided', 6, (args, next) => {
             if (this.Enabled && this.AnyRestrictions(r => r.Move)) {
-                return;
+                return false;
             }
             return next(args);
         }, ModuleCategory.States);
