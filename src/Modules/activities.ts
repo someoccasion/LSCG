@@ -6,7 +6,7 @@ import { ItemUseModule } from "./item-use";
 import { CollarModule } from "./collar";
 import { ActivitySettingsModel } from "Settings/Models/activities";
 import { GuiActivities } from "Settings/activities";
-import { LeashingModule } from "./leashing";
+import { GrabType, LeashingModule } from "./leashing";
 import { HypnoModule } from "./hypno";
 import { StateMigrator } from "./Migrators/StateMigrator";
 import { StateModule } from "./states";
@@ -33,7 +33,11 @@ export interface CustomReaction {
 }
 
 export interface CustomAction {
-    Func(target: Character | null, args: any[], next: (args: any[]) => any): any;
+    /**
+     * @param target 
+     * @returns false means skip processing the sent message hook, true or undefined means pass it down
+     */
+    Func(target: Character | null, data: ServerChatRoomMessage, meta: IChatRoomMessageMetadata | undefined): boolean | void;
 }
 
 export interface CustomPreparse {
@@ -97,38 +101,38 @@ export class ActivityModule extends BaseModule {
 
     load(): void {
         hookFunction("ServerSend", 100, (args, next) => {
-            if (args[0] == "ChatRoomChat" && args[1]?.Type == "Activity"){
-                let data = args[1];
-                let actName = GetActivityName(data) ?? "";
-                var isPatched = this.CheckForPatchedActivity(actName, data.Content);
-                if (actName.indexOf("LSCG_") == 0 || isPatched) {
-                    let preParse = this.CustomPreparseCallbacks.get(actName);
-                    if (!!preParse)
-                        preParse(args);
+            let data = args[1] as ServerChatRoomMessage;
+            if (args[0] !== "ChatRoomChat" || data?.Type !== "Activity")
+                return next(args);
 
-                    let target = GetTargetCharacter(data);
-                    var targetChar = getCharacter(target!);
-                    let {metadata, substitutions} = ChatRoomMessageRunExtractors(data, Player)
-                    let msg = ActivityDictionaryText(data.Content);
-                    msg = CommonStringSubstitute(msg, substitutions ?? [])
-                    data.Dictionary.push({
-                        Tag: "MISSING ACTIVITY DESCRIPTION FOR KEYWORD " + data.Content,
-                        Text: msg
-                    });
-
-                    // If action name has a custom action, run it as part of the chain
-                    var customAction = this.CustomActionCallbacks.get(actName);
-                    if (!customAction)
-                        return next(args);
-                    else
-                        return customAction(targetChar, args, next);
-                }
-                else
-                    return next(args);
-            }
-            else {
+            const actName = GetActivityName(data) ?? "";
+            const isPatched = this.CheckForPatchedActivity(actName, data.Content);
+            if (!actName.startsWith("LSCG_") && !isPatched) {
                 return next(args);
             }
+            let preParse = this.CustomPreparseCallbacks.get(actName);
+            if (preParse) preParse(args);
+
+            const target = GetTargetCharacter(data);
+            const targetChar = getCharacter(target!);
+            let { metadata, substitutions } = ChatRoomMessageRunExtractors(data, Player)
+            let msg = ActivityDictionaryText(data.Content);
+            msg = CommonStringSubstitute(msg, substitutions ?? [])
+            data.Dictionary?.push({
+                Tag: "MISSING ACTIVITY DESCRIPTION FOR KEYWORD " + data.Content,
+                Text: msg
+            });
+
+            // If action name has a custom action, run it as part of the chain
+            const customAction = this.CustomActionCallbacks.get(actName);
+            if (!customAction)
+                return next(args);
+
+            const ret = customAction(targetChar, data, metadata);
+            // On a false return here, we skip calling down through the hook
+            if (ret === false)
+                return undefined;
+            return next(args);
         }, ModuleCategory.Activities);
 
         hookFunction("ActivityCheckPrerequisite", 100, (args, next) => {
@@ -149,8 +153,7 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             }
-            else
-                return next(args);
+            return next(args);
         }, ModuleCategory.Activities)
 
         OnActivity(1, ModuleCategory.Activities, (data, sender, msg, metadata) => {
@@ -204,7 +207,7 @@ export class ActivityModule extends BaseModule {
 			if (itemType == "RubItem") {
 				let item = InventoryGet(C, "Pussy");
                 let canUsePenis = C.HasPenis() && InventoryPrerequisiteMessage(C, "AccessVulva") === "";
-				if (canUsePenis) results.push(item);
+				if (item && canUsePenis) results.push(item);
 			}
 
 			return results;
@@ -808,10 +811,9 @@ export class ActivityModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
+                Func: (target) => {
                     if (!!target)
                         this.leashingModule.DoGrab(target, "tongue");
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Pinch.png"
@@ -842,10 +844,9 @@ export class ActivityModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
+                Func: (target) => {
                     if (!!target)
                         this.leashingModule.DoRelease(target, "tongue");
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Pinch.png"
@@ -874,11 +875,10 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
+            CustomAction: {
+                Func: (target) => {
                     if (!!target)
                         this.leashingModule.DoGrab(target, "hand");
-                    return next(args);
                 }
             },
             CustomImage: ICONS.HOLD_HANDS
@@ -908,10 +908,9 @@ export class ActivityModule extends BaseModule {
                 }
             ],
             CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
+                Func: (target) => {
                     if (!!target)
                         this.leashingModule.DoRelease(target, "hand");
-                    return next(args);
                 }
             },
             CustomImage: ICONS.HOLD_HANDS
@@ -950,12 +949,11 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
-                    if (!!target && !!location && location == "ItemEars")
+            CustomAction: {
+                Func: (target, data, meta) => {
+                    if (!target || !meta?.GroupName) return;
+                    if (meta.GroupName === "ItemEars")
                         this.leashingModule.DoGrab(target, "ear");
-                    return next(args);
                 }
             },
         });
@@ -1009,11 +1007,10 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
+            CustomAction: {
+                Func: (target) => {
                     if (!!target)
                         this.leashingModule.DoRelease(target, "ear");
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Pinch.png"
@@ -1032,12 +1029,11 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
-                    if (!!target && !!location && location == "ItemArms")
+            CustomAction: {
+                Func: (target, data, meta) => {
+                    if (!target || meta?.GroupName) return;
+                    if (meta?.GroupName === "ItemArms")
                         this.leashingModule.DoGrab(target, "arm");
-                    return next(args);
                 }
             },
         });        
@@ -1085,14 +1081,13 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
-                    if (!!target && !!location && location == "ItemHood")
+            CustomAction: {
+                Func: (target, data, meta) => {
+                    if (!target || !meta?.GroupName) return;
+                    if (meta.GroupName === "ItemHood")
                         this.leashingModule.DoGrab(target, "horn");
-                    else if (!!target && !!location && location == "ItemButt")
+                    else if (meta.GroupName === "ItemButt")
                         this.leashingModule.DoGrab(target, "tail");
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Grope.png"
@@ -1114,18 +1109,15 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
-                    if (!target?.IsPlayer()) {
-                        if (!!target && location == "ItemHead")
-                            this.leashingModule.DoGrab(target, "hair");
-                        else if (!!target && location == "ItemNose")
-                            this.leashingModule.DoGrab(target, "nose");
-                        else if (!!target && location == "ItemNipples")
-                            this.leashingModule.DoGrab(target, "nipples");
-                    }
-                    return next(args);
+            CustomAction: {
+                Func: (target, data, meta) => {
+                    if (!target || !meta?.GroupName || target.IsPlayer()) return;
+                    if (meta.GroupName === "ItemHead")
+                        this.leashingModule.DoGrab(target, "hair");
+                    else if (meta.GroupName === "ItemNose")
+                        this.leashingModule.DoGrab(target, "nose");
+                    else if (meta.GroupName === "ItemNipples")
+                        this.leashingModule.DoGrab(target, "nipples");
                 }
             }
         });
@@ -1190,22 +1182,21 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
-                    if (!!target && location == "ItemArms")
-                        this.leashingModule.DoRelease(target, "arm");
-                    else if (!!target && location == "ItemHood")
-                        this.leashingModule.DoRelease(target, "horn");
-                    else if (!!target && location == "ItemButt")
-                        this.leashingModule.DoRelease(target, "tail");
-                    else if (!!target && location == "ItemHead")
-                        this.leashingModule.DoRelease(target, "hair");
-                    else if (!!target && location == "ItemNose")
-                        this.leashingModule.DoRelease(target, "nose");
-                    else if (!!target && location == "ItemNipples")
-                        this.leashingModule.DoRelease(target, "nipples");
-                    return next(args);
+            CustomAction: {
+                Func: (target, data, meta) => {
+                    if (!target || !meta?.GroupName) return;
+
+                    const locationToAreaMap: Partial<Record<AssetGroupName, GrabType>> = {
+                        "ItemArms": "arm",
+                        "ItemHood": "horn",
+                        "ItemButt": "tail",
+                        "ItemHead": "hair",
+                        "ItemNose": "nose",
+                        "ItemNipples": "nipples",
+                    }
+                    const area = locationToAreaMap[meta.GroupName];
+                    if (!area) return;
+                    this.leashingModule.DoRelease(target, area);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Slap.png"
@@ -1214,12 +1205,10 @@ export class ActivityModule extends BaseModule {
         // PatchChoke Neck
         this.PatchActivity(<ActivityPatch>{
             ActivityName: "Choke",
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
-                    if (!!target && !!location && location == "ItemNeck")
-                        this.leashingModule.DoGrab(target, "neck");
-                    return next(args);
+            CustomAction: {
+                Func: (target, data, meta) => {
+                    if (!target || meta?.GroupName !== "ItemNeck") return;
+                    this.leashingModule.DoGrab(target, "neck");
                 }
             },
         });
@@ -1250,11 +1239,10 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
+            CustomAction: {
+                Func: (target) => {
                     if (!!target)
                         this.leashingModule.DoRelease(target, "neck");
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Choke.png"
@@ -1270,8 +1258,7 @@ export class ActivityModule extends BaseModule {
                 }
             }],
             CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
+                Func: (target) => {
                     if (!!target && !!target.MemberNumber) {
                         this.leashingModule.DoGrab(target, "collar");
                         // Move next to player...?
@@ -1297,7 +1284,6 @@ export class ActivityModule extends BaseModule {
                             }
                         }
                     }
-                    return next(args);
                 }
             },
         });
@@ -1326,11 +1312,10 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
+            CustomAction: {
+                Func: (target) => {
                     if (!!target)
                         this.leashingModule.DoRelease(target, "collar");
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Slap.png"
@@ -1360,14 +1345,14 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
-                    if (!!target && !!location && location == "ItemMouth")
+            CustomAction: {
+                Func: (target, data, meta) => {
+                    if (!target || !meta?.GroupName) return;
+
+                    if (meta.GroupName == "ItemMouth")
                         this.leashingModule.DoGrab(target, "mouth");
-                    if (!!target && !!location && location == "ItemHead")
+                    if (meta.GroupName == "ItemHead")
                         this.leashingModule.DoGrab(target, "eyes");
-                    return next(args);
                 }
             },
         });
@@ -1406,14 +1391,13 @@ export class ActivityModule extends BaseModule {
                     }
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
-                    if (!!target && !!location && location == "ItemMouth")
+            CustomAction: {
+                Func: (target, data, meta) => {
+                    if (!target || !meta?.GroupName) return;
+                    if (meta?.GroupName === "ItemMouth")
                         this.leashingModule.DoRelease(target, "mouth");
-                    if (!!target && !!location && location == "ItemHead")
+                    if (meta?.GroupName === "ItemHead")
                         this.leashingModule.DoRelease(target, "eyes");
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/HandGag.png"
@@ -1444,10 +1428,9 @@ export class ActivityModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
+                Func: (target) => {
                     if (!!target)
                         this.leashingModule.DoGrab(target, "mouth-with-foot");
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/MassageFeet.png"
@@ -1478,10 +1461,9 @@ export class ActivityModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
+                Func: (target) => {
                     if (!!target)
                         this.leashingModule.DoRelease(target, "mouth-with-foot");
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/MassageFeet.png"
@@ -1659,11 +1641,9 @@ export class ActivityModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
-                    if (!!target) {
+                Func: (target) => {
+                    if (!!target) 
                         this.leashingModule.DoGrab(target, "chomp");
-                    }
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Bite.png"
@@ -1709,11 +1689,9 @@ export class ActivityModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
-                    if (!!target) {
+                Func: (target) => {
+                    if (!!target) 
                         this.leashingModule.DoRelease(target, "chomp");
-                    }
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Kiss.png"
@@ -1748,10 +1726,9 @@ export class ActivityModule extends BaseModule {
                 }
             ],
             CustomAction: {
-                Func: (target, args, next) => {
+                Func: (target) => {
                     if (!!target)
                         getModule<SplatterModule>("SplatterModule")?.ClearSplatInMouth(Player);
-                    return next(args);
                 }
             },
             CustomImage: "Assets/Female3DCG/Activity/Kiss.png"
@@ -1767,12 +1744,11 @@ export class ActivityModule extends BaseModule {
                     TargetAction: "SourceCharacter licks TargetCharacter's forehead."
                 }
             ],
-            CustomAction: <CustomAction>{
-                Func: (target, args, next) => {
-                    var location = GetMetadata(args[1])?.GroupName;
-                    var splatter = getModule<SplatterModule>("SplatterModule");
+            CustomAction: {
+                Func: (target, data, meta) => {
+                    const splatter = getModule<SplatterModule>("SplatterModule");
                     if (!!splatter) {
-                        switch (location) {
+                        switch (meta?.GroupName) {
                             case "ItemMouth":
                                 splatter.AddSplatInMouth(Player, target, "mouth");
                                 break;
@@ -1800,7 +1776,6 @@ export class ActivityModule extends BaseModule {
                                 break;
                         }
                     }
-                    return next(args);
                 }
             },
         });
@@ -1831,19 +1806,19 @@ export class ActivityModule extends BaseModule {
                 }
             ],
 			CustomAction: {
-				Func: (target, args, next) => {
+				Func: (target) => {
 					if (!target)
-						return;
+						return false;
                     if (target.IsPlayer()) {
                         this.ExecuteHighFive(null);
-                        next(args);
-                    }
-                    else if (this.isPlayerGrabbing(target.MemberNumber ?? -1)) {
+                        return true;
+                    } else if (this.isPlayerGrabbing(target.MemberNumber ?? -1)) {
                         SendAction(`%NAME% holds %OPP_NAME_POSSESSIVE_DIRECT% arm up and slaps it in a forced high five!`, target);
                         this.ExecuteHighFive(target);
+                        return false;
                     } else {
                         this.TryHighFive(target);
-                        next(args);
+                        return true;
                     }
 				}
 			},
@@ -1869,7 +1844,7 @@ export class ActivityModule extends BaseModule {
 
     CustomPrerequisiteFuncs: Map<string, (acting: Character, acted: Character, group: AssetGroup) => boolean> = new Map<string, (acting: Character, acted: Character, group: AssetGroup) => boolean>();
     CustomIncomingActivityReactions: Map<string, (sender: Character | null) => void> = new Map<string, (sender: Character | null) => void>();
-    CustomActionCallbacks: Map<string, (target: Character | null, args: any[], next: (args: any[]) => any) => any> = new Map<string, (sender: Character | null, args: any[], next: (args: any[]) => any) => any>();
+    CustomActionCallbacks: Map<string, CustomAction["Func"]> = new Map<string, CustomAction["Func"]>();
     CustomPreparseCallbacks: Map<string, (args: any[]) => void> = new Map<string, (args: any[]) => void>();
     CustomImages: Map<string, string> = new Map<string, string>;
     PatchedActivities: string[] = [];
@@ -2060,20 +2035,18 @@ export class ActivityModule extends BaseModule {
         ).forEach((locations, activityName, map) => {
             this.PatchActivity(<ActivityPatch>{
                 ActivityName: activityName,
-                CustomAction: <CustomAction>{
-                    Func: (target, args, next) => this.CheckForErectionCustomAction(target, args, next, locations ?? ["ItemPenis"])
+                CustomAction: {
+                    Func: (target, data, meta) => this.CheckForErectionCustomAction(target, meta?.GroupName, locations ?? ["ItemPenis"])
                 },
             });
         });
     }
 
-    CheckForErectionCustomAction(target: Character | null, args: any[], next: (args: any[]) => any, allowedLocations: string[]): any {
+    CheckForErectionCustomAction(target: Character | null, location: AssetGroupName | undefined, allowedLocations: string[]): any {
         if (Player.LSCG.GlobalModule.erectionDetection) {
-            var location = GetMetadata(args[1])?.GroupName;
             if (!!target && !!location && allowedLocations.some(loc => loc == location))
                 this.CheckForErection(target);
         }
-        return next(args);
     }
 
     CheckForErection(target: Character) {

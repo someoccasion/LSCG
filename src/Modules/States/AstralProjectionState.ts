@@ -406,8 +406,8 @@ export class AstralProjectionState extends BaseState {
         hookFunction("ActivityAllowedForGroup", 1, (args, next) => {
             if (!this.StateModule.Enabled) return next(args);
             if (this.Active) {
-                let C = args[0];
-                var temp = Player;
+                let C = args[0] as OtherCharacter;
+                const temp = Player;
                 let ghostChar = this.GetGhostCharacter(Player) as PlayerCharacter;
                 let corpChar = this.GetCorporealCharacter(C) as PlayerCharacter;
                 

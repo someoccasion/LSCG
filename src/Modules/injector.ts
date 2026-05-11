@@ -208,8 +208,8 @@ export class InjectorModule extends BaseModule {
         });
 
         hookFunction("ServerSend", 100, (args, next) => {
-            if (args[0] == "ChatRoomChat" && args[1]?.Type == "Activity" && this.Enabled){
-                let data = args[1];
+            const data = args[1] as ServerChatRoomMessage;
+            if (args[0] == "ChatRoomChat" && data?.Type == "Activity" && this.Enabled){
                 let actName = GetActivityName(data) ?? "";
                 if (actName == "SipItem" || actName == "LSCG_FunnelPour") {
                     let fullPour = actName == "LSCG_FunnelPour";
@@ -324,7 +324,7 @@ export class InjectorModule extends BaseModule {
                     }
                 ],
                 CustomAction: {
-                    Func: (target, args, next) => {
+                    Func: (target) => {
                         if (!!target) {
                             // if (target.MemberName != Player.MemberNumber) {
                             // 	SendAction("%NAME% takes aim at %OPP_NAME% with %POSSESSIVE% net gun.", target);
@@ -334,9 +334,7 @@ export class InjectorModule extends BaseModule {
                             // 	this.ShootNetgun(target)
                             // }
                             setTimeout(() => this.ShootNetgun(target), EFFECT_DURATIONS.ACTION_DELAY);
-                            return next(args);
                         }
-                        else return next(args);
                     }
                 },
                 CustomImage: "Assets/Female3DCG/ItemDevices/Preview/Net.png"
