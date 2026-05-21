@@ -469,17 +469,12 @@ export class ItemUseModule extends BaseModule {
 			PreferredTypes: [{Location: "ItemMouth", Type: 1}],
 			UsedAssetOverride: "bandana"
 		},{
-			MouthItemName: "ClothGag",
-			NeckItemName: "Scarf",
-			OverrideNeckLocation: "ClothAccessory",
-			PreferredTypes: [{Location: "ItemMouth", Type: 3}]
-		},{
 			MouthItemName: "FurScarf",
 			NeckItemName: "FurScarf"
 		},{
 			MouthItemName: "ClothGag",
 			NeckItemName: "SatinScarf",
-			PreferredTypes: [{Location: "ItemMouth", Type: 2}]
+			PreferredTypes: [{Location: "ItemMouth", Type: 2}, {Location: "Necklace", Type: 3}]
 		}
 	]
 
@@ -1614,6 +1609,8 @@ export class ItemUseModule extends BaseModule {
 			if ((sourceLocation?.startsWith("ItemMouth") && targetLocation == "Necklace") ||
 				(sourceLocation == "Necklace" && targetLocation?.startsWith("ItemMouth")))
 				color = color.reverse();
+				if (targetLocation == "Necklace" && color[0] == "Default" && color[1] == "Default")
+					color = ["#828282", "#BC3030"]; // default hack :c
 			else if (sourceLocation == "Necklace" && targetLocation == "ItemHandheld")
 				color = [color[1]];
 			else if (sourceLocation == "ItemHandheld") {
