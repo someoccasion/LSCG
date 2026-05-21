@@ -1720,8 +1720,7 @@ export class ActivityModule extends BaseModule {
                     Func: (acting, acted, group): boolean => {
                         if (acting.MemberNumber != acted.MemberNumber)
                             return false;
-                        
-                        return getModule<SplatterModule>("SplatterModule")?.IsSplatInMouth(acting);
+                        return true;
                     }
                 }
             ],
