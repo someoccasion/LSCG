@@ -297,6 +297,11 @@ export class InjectorModule extends BaseModule {
             return next(args);
         }, ModuleCategory.Injector);
 
+        // Add to bcx bc patch fix
+        hookFunction("ServerPlayerIsInChatRoom", 0, (args, next) => {
+			return next(args) || CurrentScreen === this.sleepyGame.name || CurrentScreen === this.brainWashGame.name;
+		}, ModuleCategory.Injector);
+
         this.InitializeRestrictiveHooks();
 
         (<any>window).LSCG_InjectEnd_Sedative = () => this.MiniGameEnd("sedative", MiniGameVictory);
