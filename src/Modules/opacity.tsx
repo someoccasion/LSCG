@@ -3,7 +3,7 @@ import { BaseModule } from "base";
 import { getModule } from "modules";
 import { OpacitySettingsModel } from "Settings/Models/base";
 import { ModuleCategory } from "Settings/setting_definitions";
-import { hookFunction, isDrawingOverridable } from "../utils";
+import { hookFunction, isDrawingOverridable, patchFunction } from "../utils";
 import { StateModule } from "./states";
 import { endsWith, kebabCase, replace } from "lodash-es";
 import styles from "./opacity.scss?inline";
@@ -498,6 +498,10 @@ export class OpacityModule extends BaseModule {
             return next(args);
         }, ModuleCategory.Opacity);
 
+        patchFunction("CharacterAppearanceVisible", {
+            "const Excluded = HideItemExclude?.includes(GroupName + AssetName);": "const Excluded = HideItemExclude?.includes('*') || HideItemExclude?.includes(GroupName + AssetName);"
+        });
+
         hookFunction("CharacterAppearanceSortLayers", 1, (args, next) => {
             let C = args[0] as OtherCharacter;
             if (!C || !this.Enabled)
@@ -516,19 +520,9 @@ export class OpacityModule extends BaseModule {
                     hasOpacitySettings = !opacity.every((opac, i) => opac === item.Asset.Layer[i]?.Opacity);
                 }
                 if ((hasOpacitySettings || xrayActive || IsSoulBind(item)) && !item.Property?.LSCGLeadLined) {
-                    const asset: Mutable<Asset> = Object.assign({}, item.Asset);
-                    item.Asset = asset;
-                    asset.Layer = asset.Layer.map(l => Object.assign({}, l, { Alpha: [], }));
-                    asset.Hide = [];
-                    asset.HideItem = [];
-                    asset.HideItemAttribute = [];
-                } else {
-                    let defaultAsset = AssetMap.get(`${item?.Asset?.Group?.Name}/${item.Asset.Name}`);
-                    if (!!defaultAsset) {
-                        const asset : Mutable<Asset> = Object.assign({}, defaultAsset);
-                        item.Asset = asset;
-                        asset.Layer = defaultAsset.Layer.map(l => Object.assign({}, l));
-                    }
+                    if (!item.Property)
+                        item.Property = {};
+                    item.Property.HideItemExclude = ["*"]; // Exclude from BC's HideItem system to prevent it from overriding the LSCG opacity changes
                 }
 
                 if (item.Asset.Name == "Penis") {
