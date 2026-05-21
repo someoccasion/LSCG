@@ -535,7 +535,12 @@ export class HypnoModule extends BaseModule {
             });
             let str = "⚠" + tWords.join(" ") + "⚠";
 
-            msg = msg.replaceAll(new RegExp("\\b" + escapeRegExp(t) + "\\b", "ig"), str);
+            let re = this._blankOutRegexCache.get(t);
+            if (!re) {
+                re = new RegExp("\\b" + escapeRegExp(t) + "\\b", "ig");
+                this._blankOutRegexCache.set(t, re);
+            }
+            msg = msg.replaceAll(re, str);
         });
         return msg;
     }
@@ -555,6 +560,7 @@ export class HypnoModule extends BaseModule {
     ]
 
     delayedActivations: Map<string, number> = new Map<string,number>();
+    private _blankOutRegexCache = new Map<string, RegExp>();
 
     DelayedTrigger(activityEntry: ActivityEntryModel, memberNumber: number = 0, isSleep: boolean = false) {
         let entryName = activityEntry.group + "-" + activityEntry.name;
@@ -600,6 +606,8 @@ export class HypnoModule extends BaseModule {
     }
 
     CheckSuggestions(msg: string, sender: Character) {
+        if (!this.settings.suggestions.length || msg.startsWith("("))
+            return;
         let suggestion = this.settings.suggestions.find(s => this._CheckForTriggers(msg, sender, [s.trigger], this.hypnoActivated) && (!s.exclusive || s.installedBy == sender.MemberNumber))
         if (!!suggestion) {
             let commandArgs = msg.slice(msg.toLocaleLowerCase().indexOf(suggestion.trigger.toLocaleLowerCase()) + suggestion.trigger.length)?.trim() ?? "";

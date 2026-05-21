@@ -65,22 +65,21 @@ export class ResizedState extends BaseState {
         }
 
         hookFunction("CharacterAppearanceGetCurrentValue", 1, (args, next) => {
-            let C = args[0] as OtherCharacter;
-            let Group = args[1];
-            let Type = args[2];
+            const [C, Group, Type] = args as [C: OtherCharacter, Group: AssetGroupName, Type: keyof CharacterAppearanceValues];
             let ret = next(args);
-            if (!Player.LSCG?.GlobalModule?.hideResizing && Group == "Height" && Type == "Zoom") {
-                if ((Player.VisualSettings?.ForceFullHeight ?? false) || !C || !C.LSCG || !C.LSCG.StateModule || !!CurrentCharacter)
-                    return ret;
-                if (ret == "None")
-                    ret = 1;
-                let stateModule = C.LSCG.StateModule;
-                if (stateModule.states.find(s => s.type == "resized")?.active) {
-                    let enlarge = stateModule.states.find(s => s.type == "resized")?.extensions["enlarged"] ?? false;
-                    ret *= enlarge ? 1.5 : 1;//.75;
-                }
+            if (Player.LSCG?.GlobalModule?.hideResizing || Group !== "Height" || Type !== "Zoom")
+                return ret;
+
+            if ((Player.VisualSettings?.ForceFullHeight ?? false) || !C || !C.LSCG || !C.LSCG.StateModule || !!CurrentCharacter)
+                return ret;
+
+            let zoom: number = ret === "None" ? 1 : ret as number;
+            let stateModule = C.LSCG.StateModule;
+            if (stateModule.states.find(s => s.type == "resized")?.active) {
+                let enlarge = stateModule.states.find(s => s.type == "resized")?.extensions["enlarged"] ?? false;
+                zoom *= enlarge ? 1.5 : 1;//.75;
             }
-            return ret;
+            return zoom;
         }, ModuleCategory.States);
 
         hookFunction("CommonDrawAppearanceBuild", 1, (args, next) => {

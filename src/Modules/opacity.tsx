@@ -3,11 +3,12 @@ import { BaseModule } from "base";
 import { getModule } from "modules";
 import { OpacitySettingsModel } from "Settings/Models/base";
 import { ModuleCategory } from "Settings/setting_definitions";
-import { hookFunction, isDrawingOverridable } from "../utils";
+import { hookFunction, isDrawingOverridable, patchFunction } from "../utils";
 import { StateModule } from "./states";
 import { endsWith, kebabCase, replace } from "lodash-es";
 import styles from "./opacity.scss?inline";
 import { IsSoulBind } from "./States/AstralProjectionState";
+import { GetDotedPathType, PatchHook } from "bondage-club-mod-sdk";
 
 interface OpacitySlider {
     ElementId: string;
@@ -21,7 +22,7 @@ interface TranslationValue {
 }
 
 interface PropertiesWithLayerOverrides extends ItemProperties {
-    LayerOverrides: any[];
+    LayerOverrides: { DrawingLeft: TopLeft.Data; DrawingTop: TopLeft.Data; }[];
 }
 
 const root = "lscg-layers";
@@ -392,7 +393,7 @@ export class OpacityModule extends BaseModule {
                 this._unhookResize = hookFunction("CurrentScreenFunctions.Resize", 0, (args2, next) => {
                     const [load] = args2;
                     this.ResizeDomUI(load);
-                    return next(args);
+                    return next(args2);
                 });
                 CurrentScreenFunctions.Resize(true);
 
@@ -438,47 +439,43 @@ export class OpacityModule extends BaseModule {
 
         // *** Hack in actual updating of the translation overrides ***
         hookFunction("CommonCallFunctionByNameWarn", 2, (args, next) => {
-            let funcName = args[0];
-            let params = args[1];
-            if (!params) {
+            const [funcName, funcArgs] = args;
+            if (!/Assets(.+)BeforeDraw/i.test(funcName) || !funcArgs) {
                 return next(args);
             }
-            let C = params['C'] as OtherCharacter;
-            let CA = params['CA'] as Item;
-            let groupName = params['GroupName'];
-            let Property = params['Property'];
-            let regex = /Assets(.+)BeforeDraw/i;
-            if (regex.test(funcName)) {
-                let ret = CommonCallFunctionByName(args[0], args[1]) ?? {};
-                if (this.Enabled && !!CA && isDrawingOverridable(CA) && !!Property) {
-                    let layerName = (params['L'] as string ?? "").trim();
-                    if (layerName[0] == '_')
-                        layerName = layerName.slice(1);
-                    let layerIx = CA.Asset.Layer.findIndex(l => (l.Name ?? "") == layerName);
 
-                    let xOverride = Property?.LayerOverrides?.[layerIx]?.DrawingLeft?.[PoseType.DEFAULT] ?? undefined;
-                    let yOverride = Property?.LayerOverrides?.[layerIx]?.DrawingTop?.[PoseType.DEFAULT] ?? undefined;
+            const params = funcArgs as Parameters<PatchHook<GetDotedPathType<typeof globalThis, "AssetsItemArmsHempRopeBeforeDraw">>>[0][0]
+            const { C: origC, CA, GroupName: groupName, Property: origProp, L } = params;
+            const C = origC as OtherCharacter;
+            const Property = origProp as PropertiesWithLayerOverrides;
+            const ret = CommonCallFunctionByName(...args) ?? {};
+            if (this.Enabled && !!CA && isDrawingOverridable(CA) && !!Property) {
+                let layerName = L.trim();
+                if (layerName[0] == '_')
+                    layerName = layerName.slice(1);
+                let layerIx = CA.Asset.Layer.findIndex(l => (l.Name ?? "") == layerName);
 
-                    // Adjust for pose. BIGGER change would be to actually save the lscg translate as offsets instead of overrides... which... should be done but will suck >.<
-                    if (!!xOverride || !!yOverride) {
-                        for (const drawPose of C.DrawPose) {
-                            const PoseDef = PoseRecord[drawPose];
-                            if (PoseDef && PoseDef.MovePosition) {
-                                const MovePosition = PoseDef.MovePosition.find(MP => MP.Group === groupName);
-                                if (MovePosition) {
-                                    if (!!xOverride) xOverride += MovePosition.X;
-                                    if (!!yOverride) yOverride += MovePosition.Y;
-                                }
+                let xOverride = Property?.LayerOverrides?.[layerIx]?.DrawingLeft?.[PoseType.DEFAULT] ?? undefined;
+                let yOverride = Property?.LayerOverrides?.[layerIx]?.DrawingTop?.[PoseType.DEFAULT] ?? undefined;
+
+                // Adjust for pose. BIGGER change would be to actually save the lscg translate as offsets instead of overrides... which... should be done but will suck >.<
+                if (!!xOverride || !!yOverride) {
+                    for (const drawPose of C.DrawPose) {
+                        const PoseDef = PoseRecord[drawPose];
+                        if (PoseDef && PoseDef.MovePosition) {
+                            const MovePosition = PoseDef.MovePosition.find(MP => MP.Group === groupName);
+                            if (MovePosition) {
+                                if (!!xOverride) xOverride += MovePosition.X;
+                                if (!!yOverride) yOverride += MovePosition.Y;
                             }
                         }
                     }
-
-                    if (!!xOverride) ret.X = xOverride;
-                    if (!!yOverride) ret.Y = yOverride + CanvasUpperOverflow;
                 }
-                return ret
-            } else
-                return next(args);
+
+                if (!!xOverride) ret.X = xOverride;
+                if (!!yOverride) ret.Y = yOverride + CanvasUpperOverflow;
+            }
+            return ret
         }, ModuleCategory.Opacity);
     }
 
@@ -501,6 +498,10 @@ export class OpacityModule extends BaseModule {
             return next(args);
         }, ModuleCategory.Opacity);
 
+        patchFunction("CharacterAppearanceVisible", {
+            "const Excluded = HideItemExclude?.includes(GroupName + AssetName);": "const Excluded = HideItemExclude?.includes('*') || HideItemExclude?.includes(GroupName + AssetName);"
+        });
+
         hookFunction("CharacterAppearanceSortLayers", 1, (args, next) => {
             let C = args[0] as OtherCharacter;
             if (!C || !this.Enabled)
@@ -514,25 +515,14 @@ export class OpacityModule extends BaseModule {
                 if (opacity == null) {
                     hasOpacitySettings = false;
                 } else if (typeof opacity === "number") {
-                    hasOpacitySettings = item.Asset.Opacity !== opacity;
+                    hasOpacitySettings = item.Asset.Layer.some(l => l.Opacity !== opacity);
                 } else if (Array.isArray(opacity)) {
                     hasOpacitySettings = !opacity.every((opac, i) => opac === item.Asset.Layer[i]?.Opacity);
                 }
                 if ((hasOpacitySettings || xrayActive || IsSoulBind(item)) && !item.Property?.LSCGLeadLined) {
-                    item.Asset = Object.assign({}, item.Asset);
-                    (item.Asset as any).Layer = item.Asset.Layer.map(l => Object.assign({}, l));
-                    item?.Asset?.Layer?.forEach(layer => {
-                        (layer as any).Alpha = [];
-                    });
-                    (item.Asset as any).Hide = [];
-                    (item.Asset as any).HideItem = [];
-                    (item.Asset as any).HideItemAttribute = [];
-                } else {
-                    let defaultAsset = AssetMap.get(`${item?.Asset?.Group?.Name}/${item.Asset.Name}`);
-                    if (!!defaultAsset) {
-                        item.Asset = Object.assign({}, defaultAsset);
-                        (item.Asset as any).Layer = defaultAsset.Layer.map(l => Object.assign({}, l));
-                    }
+                    if (!item.Property)
+                        item.Property = {};
+                    item.Property.HideItemExclude = ["*"]; // Exclude from BC's HideItem system to prevent it from overriding the LSCG opacity changes
                 }
 
                 if (item.Asset.Name == "Penis") {
@@ -802,11 +792,12 @@ export class OpacityModule extends BaseModule {
     }
 
     ResetTranslation() {
-        if (!this.OpacityItem || !this.OpacityItem.Property || !(this.OpacityItem.Property as PropertiesWithLayerOverrides).LayerOverrides)
+        const properties = this.OpacityItem?.Property as PropertiesWithLayerOverrides;
+        if (!this.OpacityItem || !this.OpacityItem.Property || !properties.LayerOverrides)
             return;
-        (this.OpacityItem.Property as PropertiesWithLayerOverrides).LayerOverrides?.forEach(layer => {
-            layer.DrawingLeft = this.OpacityItem?.Asset.DrawingLeft;
-            layer.DrawingTop = this.OpacityItem?.Asset.DrawingTop;
+        properties.LayerOverrides.forEach((layer, i) => {
+            layer.DrawingLeft = this.OpacityItem?.Asset.Layer[i]?.DrawingLeft ?? { [PoseType.DEFAULT]: 1, };
+            layer.DrawingTop = this.OpacityItem?.Asset.Layer[i]?.DrawingTop ?? { [PoseType.DEFAULT]: 1, };
             this.SelectedTranslationLayer = -1;
         });
         this.SetTranslationElementValues();

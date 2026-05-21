@@ -157,17 +157,16 @@ export class MiscModule extends BaseModule {
 
         // Set chloroform'd state on room join
         hookFunction("ChatRoomSync", 4, (args, next) => {
-            next(args);
-            if (!this.settings.chloroformEnabled) {
-                return;
+            const ret = next(args);
+            if (this.settings.chloroformEnabled) {    
+                this.isChloroformed = this.IsWearingChloroform();
+                
+                if (this.isChloroformed && !this.sleepState.Active) {
+                    this.sleepState.Activate();
+                    this.ActivateChloroEvent();
+                }
             }
-            
-            this.isChloroformed = this.IsWearingChloroform();
-
-            if (this.isChloroformed && !this.sleepState.Active) {
-                this.sleepState.Activate();
-                this.ActivateChloroEvent();
-            }
+            return ret;
         }, ModuleCategory.Misc);
 
         hookFunction("TimerProcess", 1, (args, next) => {

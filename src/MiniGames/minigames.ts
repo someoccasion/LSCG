@@ -29,7 +29,8 @@ export function getMiniGame<T extends BaseMiniGame>(miniGameType: string): T {
 
 hookFunction("TextLoad", 5, (args, next) => {
     if (CurrentScreen.startsWith("LSCG_"))
-        return;
+        // We don't use the BC translation system
+        return undefined!;
     else
         return next(args);
 })

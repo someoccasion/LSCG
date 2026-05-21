@@ -146,13 +146,6 @@ export class SleepyMiniGame extends BaseMiniGame {
 
         DrawProgressBar(500 - this.SleepyMaxPosition, 800, 2*this.SleepyMaxPosition, 50, 100*(this.SleepyPosition/this.SleepyMaxPosition));
         DrawText(this.hintText, 500, 875, "white", "black");
-
-        // var debugStr = "Chal: " + this.SleepyChallenge + " Pos: " + this.SleepyPosition + " Vel: " + this.SleepyVelocity + " Acc: " + this.SleepyAcceleration;
-        // var prev = MainCanvas.textAlign;
-        // MainCanvas.textAlign = "left";
-        // DrawText(debugStr, 0, 100, "White", "Black");
-        // MainCanvas.textAlign = prev;
-        // console.info(debugStr);
     }
 
     UpdateEyes() {
@@ -167,11 +160,12 @@ export class SleepyMiniGame extends BaseMiniGame {
     }
 
     Run() {
-        ChatRoomRun(CommonTime());
+	    DrawRect(0, 0, 1000, 1000, "Black");
 
         if (this.IsStartDelay) {
             DrawText(this.startText, 500, 500, "white", "black");
         } else if (this.IsGameActive) {
+            DrawCharacter(Player, 400, 150, 0.6);
             this.RunGame(TimerRunInterval);
         } else if ((this.IsGameTimeout || this.GameFailed) && !MiniGameEnded) {
             this.End(this.SleepyPosition > 0);

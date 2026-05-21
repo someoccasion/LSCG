@@ -762,8 +762,10 @@ export class SplatterModule extends BaseModule {
     }
 
     ClearSplatInMouth(C: Character) {
-        new SplatterMapping(C).cleanInMouth();
-        ChatRoomCharacterUpdate(C);
+        if (this.IsSplatInMouth(C)) {
+            new SplatterMapping(C).cleanInMouth();
+            ChatRoomCharacterUpdate(C);
+        }
     }
 
     AddSplatInMouth(C: Character, source: Character | undefined | null, sourceLocation: SplatterLocation | undefined | null) {
