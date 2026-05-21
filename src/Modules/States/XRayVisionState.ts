@@ -3,6 +3,7 @@ import { BaseState } from "./BaseState";
 import { StateModule } from "Modules/states";
 import { ModuleCategory } from "Settings/setting_definitions";
 import { getModule } from "modules";
+import { GetDotedPathType, PatchHook } from "bondage-club-mod-sdk";
 
 export class XRayVisionState extends BaseState {
     XRayKeywords: string[] = [
@@ -57,28 +58,26 @@ export class XRayVisionState extends BaseState {
 
     Init(): void {
         hookFunction("CommonCallFunctionByName", 1, (args, next) => {
-            let funcName = args[0];
-            let params = args[1];
-            if (!params) {
+            const [funcName, funcArgs] = args;
+            if (!/Assets(.+)BeforeDraw/i.test(funcName) || !funcArgs || !this.Active) {
                 return next(args);
             }
-            let C = params['C'] as OtherCharacter;
-            let CA = params['CA'] as Item;
-            let regex = /Assets(.+)BeforeDraw/i;
-            if (regex.test(funcName) && this.Active) {
-                let opacityEnabled = Player.IsPlayer() && (Player.LSCG?.OpacityModule?.enabled ?? true);
-                let ret = next(args) ?? {};
-                if (opacityEnabled && this.CanViewXRay(C) && !!CA && isCloth(CA) && !(params['Property']?.LSCGLeadLined ?? false)) {
-                    let layerName = (params['L'] as string ?? "")?.trim() ?? "";
-                    let layerIx = CA.Asset.Layer.findIndex(l => l.Name == layerName);
-                    let originalLayerOpacity = (Array.isArray(CA?.Property?.Opacity) ? CA?.Property?.Opacity[layerIx] : CA.Property?.Opacity) ?? CA.Asset.Opacity;
-                    let curOpacity = ret.Opacity ?? originalLayerOpacity ?? 1;
-                    ret.Opacity = curOpacity * .5;
-                    ret.AlphaMasks = [];
-                }
-                return ret;
-            } else
-                return next(args);
+
+            const params = funcArgs as Parameters<PatchHook<GetDotedPathType<typeof globalThis, "AssetsItemArmsHempRopeBeforeDraw">>>[0][0]
+            const { C: origC, CA, L } = params;
+            const C = origC as OtherCharacter;
+
+            let opacityEnabled = Player.IsPlayer() && (Player.LSCG?.OpacityModule?.enabled ?? true);
+            let ret = next(args) ?? {};
+            if (opacityEnabled && this.CanViewXRay(C) && !!CA && isCloth(CA) && !(params['Property']?.LSCGLeadLined ?? false)) {
+                let layerName = L?.trim() ?? "";
+                let layerIx = CA.Asset.Layer.findIndex(l => l.Name == layerName);
+                let originalLayerOpacity = (Array.isArray(CA?.Property?.Opacity) ? CA?.Property?.Opacity[layerIx] : CA.Property?.Opacity) ?? CA.Asset.Opacity;
+                let curOpacity = ret.Opacity ?? originalLayerOpacity ?? 1;
+                ret.Opacity = curOpacity * .5;
+                ret.AlphaMasks = [];
+            }
+            return ret;
         }, ModuleCategory.States);
     }
 

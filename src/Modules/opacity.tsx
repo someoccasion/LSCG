@@ -8,6 +8,7 @@ import { StateModule } from "./states";
 import { endsWith, kebabCase, replace } from "lodash-es";
 import styles from "./opacity.scss?inline";
 import { IsSoulBind } from "./States/AstralProjectionState";
+import { GetDotedPathType, PatchHook } from "bondage-club-mod-sdk";
 
 interface OpacitySlider {
     ElementId: string;
@@ -21,7 +22,7 @@ interface TranslationValue {
 }
 
 interface PropertiesWithLayerOverrides extends ItemProperties {
-    LayerOverrides: any[];
+    LayerOverrides: { DrawingLeft: TopLeft.Data; DrawingTop: TopLeft.Data; }[];
 }
 
 const root = "lscg-layers";
@@ -438,47 +439,43 @@ export class OpacityModule extends BaseModule {
 
         // *** Hack in actual updating of the translation overrides ***
         hookFunction("CommonCallFunctionByNameWarn", 2, (args, next) => {
-            let funcName = args[0];
-            let params = args[1];
-            if (!params) {
+            const [funcName, funcArgs] = args;
+            if (!/Assets(.+)BeforeDraw/i.test(funcName) || !funcArgs) {
                 return next(args);
             }
-            let C = params['C'] as OtherCharacter;
-            let CA = params['CA'] as Item;
-            let groupName = params['GroupName'];
-            let Property = params['Property'];
-            let regex = /Assets(.+)BeforeDraw/i;
-            if (regex.test(funcName)) {
-                let ret = CommonCallFunctionByName(args[0], args[1]) ?? {};
-                if (this.Enabled && !!CA && isDrawingOverridable(CA) && !!Property) {
-                    let layerName = (params['L'] as string ?? "").trim();
-                    if (layerName[0] == '_')
-                        layerName = layerName.slice(1);
-                    let layerIx = CA.Asset.Layer.findIndex(l => (l.Name ?? "") == layerName);
 
-                    let xOverride = Property?.LayerOverrides?.[layerIx]?.DrawingLeft?.[PoseType.DEFAULT] ?? undefined;
-                    let yOverride = Property?.LayerOverrides?.[layerIx]?.DrawingTop?.[PoseType.DEFAULT] ?? undefined;
+            const params = funcArgs as Parameters<PatchHook<GetDotedPathType<typeof globalThis, "AssetsItemArmsHempRopeBeforeDraw">>>[0][0]
+            const { C: origC, CA, GroupName: groupName, Property: origProp, L } = params;
+            const C = origC as OtherCharacter;
+            const Property = origProp as PropertiesWithLayerOverrides;
+            const ret = CommonCallFunctionByName(...args) ?? {};
+            if (this.Enabled && !!CA && isDrawingOverridable(CA) && !!Property) {
+                let layerName = L.trim();
+                if (layerName[0] == '_')
+                    layerName = layerName.slice(1);
+                let layerIx = CA.Asset.Layer.findIndex(l => (l.Name ?? "") == layerName);
 
-                    // Adjust for pose. BIGGER change would be to actually save the lscg translate as offsets instead of overrides... which... should be done but will suck >.<
-                    if (!!xOverride || !!yOverride) {
-                        for (const drawPose of C.DrawPose) {
-                            const PoseDef = PoseRecord[drawPose];
-                            if (PoseDef && PoseDef.MovePosition) {
-                                const MovePosition = PoseDef.MovePosition.find(MP => MP.Group === groupName);
-                                if (MovePosition) {
-                                    if (!!xOverride) xOverride += MovePosition.X;
-                                    if (!!yOverride) yOverride += MovePosition.Y;
-                                }
+                let xOverride = Property?.LayerOverrides?.[layerIx]?.DrawingLeft?.[PoseType.DEFAULT] ?? undefined;
+                let yOverride = Property?.LayerOverrides?.[layerIx]?.DrawingTop?.[PoseType.DEFAULT] ?? undefined;
+
+                // Adjust for pose. BIGGER change would be to actually save the lscg translate as offsets instead of overrides... which... should be done but will suck >.<
+                if (!!xOverride || !!yOverride) {
+                    for (const drawPose of C.DrawPose) {
+                        const PoseDef = PoseRecord[drawPose];
+                        if (PoseDef && PoseDef.MovePosition) {
+                            const MovePosition = PoseDef.MovePosition.find(MP => MP.Group === groupName);
+                            if (MovePosition) {
+                                if (!!xOverride) xOverride += MovePosition.X;
+                                if (!!yOverride) yOverride += MovePosition.Y;
                             }
                         }
                     }
-
-                    if (!!xOverride) ret.X = xOverride;
-                    if (!!yOverride) ret.Y = yOverride + CanvasUpperOverflow;
                 }
-                return ret
-            } else
-                return next(args);
+
+                if (!!xOverride) ret.X = xOverride;
+                if (!!yOverride) ret.Y = yOverride + CanvasUpperOverflow;
+            }
+            return ret
         }, ModuleCategory.Opacity);
     }
 
