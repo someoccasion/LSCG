@@ -110,7 +110,10 @@ export class SuggestionMiniGame extends BaseMiniGame {
     GameFailed: boolean = false;
 
     Run() {
-        ChatRoomRun(CommonTime());
+        //ChatRoomRun(CommonTime());
+        DrawRect(0, 0, 1000, 1000, "Black");
+        DrawCharacter(Player, 400, 150, 0.6);
+        
         if (!this.Options) {
             return this.End(true);
         }
