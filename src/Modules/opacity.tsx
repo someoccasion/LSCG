@@ -511,24 +511,23 @@ export class OpacityModule extends BaseModule {
                 if (opacity == null) {
                     hasOpacitySettings = false;
                 } else if (typeof opacity === "number") {
-                    hasOpacitySettings = item.Asset.Opacity !== opacity;
+                    hasOpacitySettings = item.Asset.Layer.some(l => l.Opacity !== opacity);
                 } else if (Array.isArray(opacity)) {
                     hasOpacitySettings = !opacity.every((opac, i) => opac === item.Asset.Layer[i]?.Opacity);
                 }
                 if ((hasOpacitySettings || xrayActive || IsSoulBind(item)) && !item.Property?.LSCGLeadLined) {
-                    item.Asset = Object.assign({}, item.Asset);
-                    (item.Asset as any).Layer = item.Asset.Layer.map(l => Object.assign({}, l));
-                    item?.Asset?.Layer?.forEach(layer => {
-                        (layer as any).Alpha = [];
-                    });
-                    (item.Asset as any).Hide = [];
-                    (item.Asset as any).HideItem = [];
-                    (item.Asset as any).HideItemAttribute = [];
+                    const asset: Mutable<Asset> = Object.assign({}, item.Asset);
+                    item.Asset = asset;
+                    asset.Layer = asset.Layer.map(l => Object.assign({}, l, { Alpha: [], }));
+                    asset.Hide = [];
+                    asset.HideItem = [];
+                    asset.HideItemAttribute = [];
                 } else {
                     let defaultAsset = AssetMap.get(`${item?.Asset?.Group?.Name}/${item.Asset.Name}`);
                     if (!!defaultAsset) {
-                        item.Asset = Object.assign({}, defaultAsset);
-                        (item.Asset as any).Layer = defaultAsset.Layer.map(l => Object.assign({}, l));
+                        const asset : Mutable<Asset> = Object.assign({}, defaultAsset);
+                        item.Asset = asset;
+                        asset.Layer = defaultAsset.Layer.map(l => Object.assign({}, l));
                     }
                 }
 
@@ -799,11 +798,12 @@ export class OpacityModule extends BaseModule {
     }
 
     ResetTranslation() {
-        if (!this.OpacityItem || !this.OpacityItem.Property || !(this.OpacityItem.Property as PropertiesWithLayerOverrides).LayerOverrides)
+        const properties = this.OpacityItem?.Property as PropertiesWithLayerOverrides;
+        if (!this.OpacityItem || !this.OpacityItem.Property || !properties.LayerOverrides)
             return;
-        (this.OpacityItem.Property as PropertiesWithLayerOverrides).LayerOverrides?.forEach(layer => {
-            layer.DrawingLeft = this.OpacityItem?.Asset.DrawingLeft;
-            layer.DrawingTop = this.OpacityItem?.Asset.DrawingTop;
+        properties.LayerOverrides.forEach((layer, i) => {
+            layer.DrawingLeft = this.OpacityItem?.Asset.Layer[i]?.DrawingLeft ?? { [PoseType.DEFAULT]: 1, };
+            layer.DrawingTop = this.OpacityItem?.Asset.Layer[i]?.DrawingTop ?? { [PoseType.DEFAULT]: 1, };
             this.SelectedTranslationLayer = -1;
         });
         this.SetTranslationElementValues();

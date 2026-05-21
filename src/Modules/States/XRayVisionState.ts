@@ -72,7 +72,7 @@ export class XRayVisionState extends BaseState {
             if (opacityEnabled && this.CanViewXRay(C) && !!CA && isCloth(CA) && !(params['Property']?.LSCGLeadLined ?? false)) {
                 let layerName = L?.trim() ?? "";
                 let layerIx = CA.Asset.Layer.findIndex(l => l.Name == layerName);
-                let originalLayerOpacity = (Array.isArray(CA?.Property?.Opacity) ? CA?.Property?.Opacity[layerIx] : CA.Property?.Opacity) ?? CA.Asset.Opacity;
+                let originalLayerOpacity = (Array.isArray(CA?.Property?.Opacity) ? CA?.Property?.Opacity[layerIx] : CA.Property?.Opacity) ?? 1;
                 let curOpacity = ret.Opacity ?? originalLayerOpacity ?? 1;
                 ret.Opacity = curOpacity * .5;
                 ret.AlphaMasks = [];

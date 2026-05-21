@@ -191,7 +191,7 @@ export class AstralProjectionState extends BaseState {
             if (IsSoulBind(CA) && opacityEnabled && C.CharacterID.indexOf("LSCGAstralProjectionCorporeal") > -1) {
                 let layerName = L?.trim() ?? "";
                 let layerIx = CA.Asset.Layer.findIndex(l => l.Name == layerName);
-                let originalLayerOpacity = (Array.isArray(CA?.Property?.Opacity) ? CA?.Property?.Opacity[layerIx] : CA.Property?.Opacity) ?? CA.Asset.Opacity;
+                let originalLayerOpacity = (Array.isArray(CA?.Property?.Opacity) ? CA?.Property?.Opacity[layerIx] : CA.Property?.Opacity) ?? 1;
                 let curOpacity = ret.Opacity ?? originalLayerOpacity ?? 1;
                 ret.Opacity = curOpacity * .4;
                 ret.AlphaMasks = [];
