@@ -478,7 +478,8 @@ export class ItemUseModule extends BaseModule {
 			NeckItemName: "FurScarf"
 		},{
 			MouthItemName: "ClothGag",
-			NeckItemName: "SatinScarf"
+			NeckItemName: "SatinScarf",
+			PreferredTypes: [{Location: "ItemMouth", Type: 2}]
 		}
 	]
 
@@ -1642,6 +1643,11 @@ export class ItemUseModule extends BaseModule {
 						gag!.Property!.TypeRecord["typed"] = prefType.Type;
 				}
 			}
+			// Stamp the source neck item so TakeGag can restore the exact scarf type
+			if (sourceLocation !== "ItemHandheld" && !!gagTarget.NeckItemName && !!gag) {
+				if (!gag.Property) gag.Property = {};
+				(gag.Property as any).LSCGNeckSource = gagTarget.NeckItemName;
+			}
 			ChatRoomCharacterUpdate(source);
 			ChatRoomCharacterUpdate(target);
 		}
@@ -1652,6 +1658,12 @@ export class ItemUseModule extends BaseModule {
 		var existing = InventoryGet(source, targetLocation);
 		let sourceItemName = (sourceLocation.startsWith("ItemMouth") ? gagTarget.MouthItemName : gagTarget.NeckItemName) ?? "";
 		let targetItemName = (targetLocation == "ItemHandheld" ? gagTarget.HandItemName : gagTarget.NeckItemName) ?? "";
+		// Restore original neck item if it was stamped when the gag was applied
+		if (targetLocation !== "ItemHandheld") {
+			const neckSource = (gag?.Property as any)?.LSCGNeckSource as string | undefined;
+			if (neckSource && this.GagTargets.some(t => t.NeckItemName === neckSource))
+				targetItemName = neckSource;
+		}
 		if (!gag || !!existing || gag.Asset.Name != sourceItemName)
 			return;
 		var validParams = ValidationCreateDiffParams(target, source.MemberNumber!);
