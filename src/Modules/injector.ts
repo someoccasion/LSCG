@@ -6,7 +6,7 @@ import { getModule } from "modules";
 import { GuiInjector } from "Settings/injector";
 import { InjectorSettingsModel } from "Settings/Models/injector";
 import { ModuleCategory, Subscreen } from "Settings/setting_definitions";
-import { OnActivity, SendAction, getRandomInt, removeAllHooksByModule, isPhraseInString, settingsSave, hookFunction, getCharacter, AUDIO, getPlayerVolume, OnAction, hookBCXCurse, GetTargetCharacter, GetActivityName, GetMetadata, GetActivityEntryFromContent, IsActivityAllowed, GetHandheldItemNameAndDescriptionConcat, GetItemName } from "../utils";
+import { OnActivity, SendAction, getRandomInt, removeAllHooksByModule, isPhraseInString, settingsSave, hookFunction, getCharacter, AUDIO, getPlayerVolume, OnAction, hookBCXCurse, GetTargetCharacter, GetActivityName, GetMetadata, GetActivityEntryFromContent, IsActivityAllowed, GetHandheldItemNameAndDescriptionConcat, GetItemName, LSCG_SendLocal } from "../utils";
 import { ActivityBundle, ActivityModule, ActivityTarget, CustomAction, CustomPrerequisite } from "./activities";
 import { HypnoModule } from "./hypno";
 import { MiscModule } from "./misc";
@@ -126,6 +126,35 @@ export class InjectorModule extends BaseModule {
 
     get settingsScreen(): Subscreen | null {
         return GuiInjector;
+    }
+
+    get commands(): ICommand[] {
+        return [{
+            Tag: "drug-boost",
+            Description: "<sleepy|hypno|horny> : Apply a one-drink boost of the specified drug type to yourself.",
+            Action: (args, msg, parsed) => {
+                if (!this.Enabled) {
+                    LSCG_SendLocal("Injector module is not enabled.");
+                    return;
+                }
+                switch (args?.trim().toLowerCase()) {
+                    case "sleepy":
+                        this.AddSedative(DRUG_EFFECT_MULTIPLIERS.DRINK_MULTIPLIER, false);
+                        LSCG_SendLocal(`Sedative boosted. Level: ${this.sedativeLevel.toFixed(1)}`);
+                        break;
+                    case "hypno":
+                        this.AddMindControl(DRUG_EFFECT_MULTIPLIERS.DRINK_MULTIPLIER, false);
+                        LSCG_SendLocal(`Mind-control boosted. Level: ${this.mindControlLevel.toFixed(1)}`);
+                        break;
+                    case "horny":
+                        this.AddHorny(DRUG_EFFECT_MULTIPLIERS.DRINK_MULTIPLIER, false);
+                        LSCG_SendLocal(`Aphrodisiac boosted. Level: ${this.hornyLevel.toFixed(1)}`);
+                        break;
+                    default:
+                        LSCG_SendLocal("Usage: /lscg drug-boost &lt;sleepy|hypno|horny&gt;");
+                }
+            }
+        }];
     }
 
     safeword(): void {
