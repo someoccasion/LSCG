@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name LSCG
 // @namespace https://www.bondageprojects.com/
-// @version 0.8.11
+// @version 0.8.12
 // @description Little Sera's Club Games
 // @author Little Sera
 // @match https://bondageprojects.elementfx.com/*
