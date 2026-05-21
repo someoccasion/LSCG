@@ -3,6 +3,7 @@ import { BaseState } from "./BaseState";
 import { StateModule } from "Modules/states";
 import { ModuleCategory } from "Settings/setting_definitions";
 import { debounce } from 'lodash-es';
+import { GetDotedPathType, PatchHook } from "bondage-club-mod-sdk";
 
 // TODO:
 // - Allow 'soulbind' bindings to be added to ghost and carry over from corporeal form if applied there.
@@ -177,29 +178,25 @@ export class AstralProjectionState extends BaseState {
 
         hookFunction("CommonCallFunctionByName", 1, (args, next) => {
             if (!this.StateModule.Enabled) return next(args);
-            let funcName = args[0];
-            let params = args[1];
-            if (!params) {
+            const [funcName, funcArgs] = args;
+            if (!/Assets(.+)BeforeDraw/i.test(funcName) || !funcArgs) {
                 return next(args);
             }
 
-            let C = params['C'] as OtherCharacter;
-            let CA = params['CA'] as Item;
-            let regex = /Assets(.+)BeforeDraw/i;
-            if (regex.test(funcName)) {
-                let opacityEnabled = (Player.LSCG?.OpacityModule?.enabled ?? true);
-                let ret = next(args) ?? {};
-                if (IsSoulBind(CA) && opacityEnabled && C.CharacterID.indexOf("LSCGAstralProjectionCorporeal") > -1) {
-                    let layerName = (params['L'] as string ?? "")?.trim() ?? "";
-                    let layerIx = CA.Asset.Layer.findIndex(l => l.Name == layerName);
-                    let originalLayerOpacity = (Array.isArray(CA?.Property?.Opacity) ? CA?.Property?.Opacity[layerIx] : CA.Property?.Opacity) ?? CA.Asset.Opacity;
-                    let curOpacity = ret.Opacity ?? originalLayerOpacity ?? 1;
-                    ret.Opacity = curOpacity * .4;
-                    ret.AlphaMasks = [];
-                }
-                return ret;
-            } else
-                return next(args);
+            const params = funcArgs as Parameters<PatchHook<GetDotedPathType<typeof globalThis, "AssetsItemArmsHempRopeBeforeDraw">>>[0][0]
+            const { C: origC, CA, L } = params;
+            const C = origC as OtherCharacter;
+            let opacityEnabled = (Player.LSCG?.OpacityModule?.enabled ?? true);
+            let ret = next(args) ?? {};
+            if (IsSoulBind(CA) && opacityEnabled && C.CharacterID.indexOf("LSCGAstralProjectionCorporeal") > -1) {
+                let layerName = L?.trim() ?? "";
+                let layerIx = CA.Asset.Layer.findIndex(l => l.Name == layerName);
+                let originalLayerOpacity = (Array.isArray(CA?.Property?.Opacity) ? CA?.Property?.Opacity[layerIx] : CA.Property?.Opacity) ?? 1;
+                let curOpacity = ret.Opacity ?? originalLayerOpacity ?? 1;
+                ret.Opacity = curOpacity * .4;
+                ret.AlphaMasks = [];
+            }
+            return ret;
         }, ModuleCategory.States)
 
         hookFunction("CharacterLoadCanvas", 1, (args, next) => {

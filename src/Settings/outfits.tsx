@@ -929,7 +929,7 @@ export class GuiOutfits extends GuiSubscreen {
         });
     }
 
-    ClickInventoryMenu(button: DialogMenuButton) {
+    ClickInventoryMenu(button: DialogMenuButtonType) {
         console.info(`Button press: ${button}`);
     }
 
