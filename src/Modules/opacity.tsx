@@ -449,6 +449,7 @@ export class OpacityModule extends BaseModule {
             const C = origC as OtherCharacter;
             const Property = origProp as PropertiesWithLayerOverrides;
             const ret = CommonCallFunctionByName(...args) ?? {};
+
             if (this.Enabled && !!CA && isDrawingOverridable(CA) && !!Property) {
                 let layerName = L.trim();
                 if (layerName[0] == '_')
@@ -475,7 +476,7 @@ export class OpacityModule extends BaseModule {
                 if (!!xOverride) ret.X = xOverride;
                 if (!!yOverride) ret.Y = yOverride + CanvasUpperOverflow;
             }
-            return ret
+            return ret;
         }, ModuleCategory.Opacity);
     }
 
@@ -502,30 +503,38 @@ export class OpacityModule extends BaseModule {
             "const Excluded = HideItemExclude?.includes(GroupName + AssetName);": "const Excluded = HideItemExclude?.includes('*') || HideItemExclude?.includes(GroupName + AssetName);"
         });
 
+        // Prevent see-through items from contributing cross-group alpha masks (GroupAlpha) to other layers.
+        // The CharacterAppearanceSortLayers hook sets HideItemExclude=["*"] before next() runs, so the flag
+        // is already present when BC accumulates groupAlphas inside CharacterAppearanceSortLayers.
+        patchFunction("CharacterAppearanceSortLayers", {
+            "drawLayer.Alpha.forEach(alpha => {": "if (!item.Property?.HideItemExclude?.includes('*')) drawLayer.Alpha.forEach(alpha => {"
+        });
+
+        hookFunction("CommonDrawApplyLayerAlphaMasks", 1, (args, next) => {
+            const [C, layer] = args as unknown as [OtherCharacter, AssetLayer, ...unknown[]];
+            if (this.Enabled) {
+                const item = C.DrawAppearance?.find(i => i.Asset === layer.Asset);
+                if (item && this.isSeeThrough(item, C)) {
+                    return;
+                }
+            }
+            return next(args);
+        }, ModuleCategory.Opacity);
+
         hookFunction("CharacterAppearanceSortLayers", 1, (args, next) => {
             let C = args[0] as OtherCharacter;
             if (!C || !this.Enabled)
                 return next(args);
 
-            let xray = getModule<StateModule>("StateModule")?.XRayState;
-            let xrayActive = xray?.Active && xray?.CanViewXRay(C);
             C.DrawAppearance?.forEach(item => {
-                let opacity = this.getOpacity(item);
-                let hasOpacitySettings = false;
-                if (opacity == null) {
-                    hasOpacitySettings = false;
-                } else if (typeof opacity === "number") {
-                    hasOpacitySettings = item.Asset.Layer.some(l => l.Opacity !== opacity);
-                } else if (Array.isArray(opacity)) {
-                    hasOpacitySettings = !opacity.every((opac, i) => opac === item.Asset.Layer[i]?.Opacity);
-                }
-                if ((hasOpacitySettings || xrayActive || IsSoulBind(item)) && !item.Property?.LSCGLeadLined) {
+                if (this.isSeeThrough(item, C)) {
                     if (!item.Property)
                         item.Property = {};
                     item.Property.HideItemExclude = ["*"]; // Exclude from BC's HideItem system to prevent it from overriding the LSCG opacity changes
                 }
 
                 if (item.Asset.Name == "Penis") {
+                    let xrayActive = getModule<StateModule>("StateModule")?.XRayState?.Active && getModule<StateModule>("StateModule")?.XRayState?.CanViewXRay(C);
                     let transpPants = !!this.getOpacity(InventoryGet(C, "ClothLower"));
                     let transpUnderwear = !!this.getOpacity(InventoryGet(C, "Panties"));
                     if ((xrayActive || transpPants || transpUnderwear) && (!item.Property || !item.Property?.OverridePriority)) {
@@ -537,6 +546,19 @@ export class OpacityModule extends BaseModule {
             });
             return next(args);
         }, ModuleCategory.Opacity);
+    }
+
+    private isSeeThrough(item: Item, C: OtherCharacter): boolean {
+        const xray = getModule<StateModule>("StateModule")?.XRayState;
+        const xrayActive = xray?.Active && xray?.CanViewXRay(C);
+        const opacity = this.getOpacity(item);
+        let hasOpacitySettings = false;
+        if (typeof opacity === "number") {
+            hasOpacitySettings = item.Asset.Layer.some(l => l.Opacity !== opacity);
+        } else if (Array.isArray(opacity)) {
+            hasOpacitySettings = !opacity.every((opac, i) => opac === item.Asset.Layer[i]?.Opacity);
+        }
+        return (hasOpacitySettings || !!xrayActive || IsSoulBind(item)) && !item.Property?.LSCGLeadLined;
     }
 
     minusX() {
